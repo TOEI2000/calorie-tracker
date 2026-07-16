@@ -1,5 +1,6 @@
-// CalTrack — week 1: photo capture + preview only.
-// AI analysis and persistence arrive in later weeks.
+// CalTrack — week 2: photo capture + preview, analysis via n8n webhook.
+
+const WEBHOOK_URL = "https://srv1699496.hstgr.cloud/webhook/calorie-upload";
 
 const cameraInput = document.getElementById("camera-input");
 const galleryInput = document.getElementById("gallery-input");
@@ -37,14 +38,60 @@ function handlePhotoSelected(event) {
   event.target.value = "";
 }
 
-analyzeBtn.addEventListener("click", () => {
-  // Week 2+: send the photo to an AI vision model and render calories here
-  console.log("Analyze clicked — AI analysis coming in a future week.", {
-    name: currentFile?.name,
-    type: currentFile?.type,
-    sizeKB: currentFile ? Math.round(currentFile.size / 1024) : 0,
-  });
+const resultsEl = document.getElementById("results");
+
+analyzeBtn.addEventListener("click", async () => {
+  if (!currentFile) {
+    showError("No photo selected yet — take a photo first.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("photo", currentFile, currentFile.name || "photo.jpg");
+
+  analyzeBtn.disabled = true;
+  showStatus("Analyzing…");
+
+  try {
+    const response = await fetch(WEBHOOK_URL, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server responded with ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    showResult(data);
+  } catch (err) {
+    showError(err.message || String(err));
+  } finally {
+    analyzeBtn.disabled = false;
+  }
 });
+
+function showStatus(message) {
+  resultsEl.replaceChildren(el("p", "results-status", message));
+}
+
+function showError(message) {
+  resultsEl.replaceChildren(el("p", "results-error", `Error: ${message}`));
+}
+
+function showResult(data) {
+  const pre = el("pre", "results-json", JSON.stringify(data, null, 2));
+  resultsEl.replaceChildren(pre);
+  document.getElementById("results-section").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// textContent (not innerHTML) so server responses can't inject markup
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  node.className = className;
+  node.textContent = text;
+  return node;
+}
 
 // Register the service worker (relative path so it works on GitHub Pages subpaths)
 if ("serviceWorker" in navigator) {
