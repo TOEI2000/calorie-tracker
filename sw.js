@@ -1,6 +1,6 @@
 // CalTrack service worker — minimal app-shell cache for offline / Add to Home Screen.
 // Bump CACHE_NAME whenever any cached file changes so clients pick up the update.
-const CACHE_NAME = "caltrack-v10";
+const CACHE_NAME = "caltrack-v11";
 
 const APP_SHELL = [
   "./",
@@ -55,5 +55,38 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     caches.match(event.request).then((cached) => cached || fetch(event.request))
+  );
+});
+
+// --- Push notifications ---
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data.json();
+  } catch {
+    /* no payload -> use defaults */
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "CalTrack", {
+      body: data.body || "ถึงเวลาบันทึกมื้อเย็นแล้ว 🍽️ ถ่ายรูปอาหารได้เลย",
+      icon: "./icons/icon-192.png",
+      badge: "./icons/icon-192.png",
+      data: { url: self.registration.scope },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if (client.url.startsWith(self.registration.scope) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      return clients.openWindow(self.registration.scope);
+    })
   );
 });

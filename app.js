@@ -315,6 +315,73 @@ window.addEventListener("online", updateQueueBanner);
 updateQueueBanner();
 // Note: loadDashboard() runs from setAuthState() once a session is confirmed.
 
+// --- Push notifications (dinner reminder) ---
+
+const VAPID_PUBLIC_KEY =
+  "BI9SsDtEzaPX71COShICQYOGZf3UwMRb82NIpZGzY1AOysfEhN1WUl-bStypKG-G5N6M-KVN11RsBma3i0PJFyA";
+
+const notifyRow = document.getElementById("notify-row");
+const notifyBtn = document.getElementById("notify-btn");
+
+function urlBase64ToUint8Array(base64) {
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  const raw = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+const pushSupported = "Notification" in window && "PushManager" in window && "serviceWorker" in navigator;
+
+async function refreshNotifyUi() {
+  if (!pushSupported) return; // row stays hidden on unsupported browsers
+  notifyRow.hidden = false;
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  notifyBtn.textContent = sub ? "ปิดแจ้งเตือน" : "เปิดแจ้งเตือน";
+}
+
+if (pushSupported) {
+  navigator.serviceWorker.ready.then(refreshNotifyUi);
+}
+
+notifyBtn.addEventListener("click", async () => {
+  notifyBtn.disabled = true;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+
+    if (existing) {
+      await db.from("push_subscriptions").delete().eq("endpoint", existing.endpoint);
+      await existing.unsubscribe();
+    } else {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        window.alert("ต้องกดอนุญาต (Allow) การแจ้งเตือนในเบราว์เซอร์ก่อนครับ");
+        return;
+      }
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+      const { error } = await db.from("push_subscriptions").upsert(
+        { user_id: currentUser?.id, endpoint: sub.endpoint, subscription: sub.toJSON() },
+        { onConflict: "endpoint" }
+      );
+      if (error) {
+        await sub.unsubscribe();
+        window.alert(`เปิดแจ้งเตือนไม่สำเร็จ — ${error.message}`);
+        return;
+      }
+      reg.showNotification("CalTrack", {
+        body: "เปิดการแจ้งเตือนแล้ว — เราจะเตือนให้บันทึกมื้อเย็นทุกวันครับ 🍽️",
+        icon: "./icons/icon-192.png",
+      });
+    }
+  } finally {
+    notifyBtn.disabled = false;
+    refreshNotifyUi();
+  }
+});
+
 // --- Share today's summary (Web Share API, clipboard fallback) ---
 
 document.getElementById("share-btn").addEventListener("click", async () => {
@@ -510,6 +577,42 @@ async function loadDashboard() {
 
   renderWeekChart(days);
   renderHistoryList(days);
+  loadStreak(todayStart);
+}
+
+// --- Streak ---
+
+async function loadStreak(todayStart) {
+  const rangeStart = new Date(todayStart);
+  rangeStart.setDate(rangeStart.getDate() - 365);
+  const { data, error } = await db
+    .from("meals")
+    .select("eaten_at")
+    .gte("eaten_at", rangeStart.toISOString());
+  if (error) return;
+  renderStreak(data, todayStart);
+}
+
+function renderStreak(rows, todayStart) {
+  const loggedDays = new Set(rows.map((r) => dayKey(new Date(r.eaten_at))));
+  const DAY_MS = 86400000;
+  const todayLogged = loggedDays.has(todayStart.getTime());
+
+  let streak = 0;
+  let cursor = todayLogged ? todayStart.getTime() : todayStart.getTime() - DAY_MS;
+  while (loggedDays.has(cursor)) {
+    streak++;
+    cursor -= DAY_MS;
+  }
+
+  const streakEl = document.getElementById("streak");
+  if (streak === 0) {
+    streakEl.textContent = "บันทึกมื้อแรกวันนี้ เพื่อเริ่ม streak 🔥";
+  } else if (todayLogged) {
+    streakEl.textContent = `🔥 บันทึกต่อเนื่อง ${streak} วัน`;
+  } else {
+    streakEl.textContent = `🔥 ต่อเนื่อง ${streak} วัน — บันทึกวันนี้เพื่อรักษา streak!`;
+  }
 }
 
 function dayLabel(date) {

@@ -86,6 +86,7 @@
       <h2 class="section-title">วันนี้กินไปแล้ว</h2>
       <div class="results-card today-card">
         <p class="today-total"><span id="today-total">0</span> kcal</p>
+        <p id="streak" class="streak"></p>
         <div class="goal-block">
           <div class="goal-bar" role="presentation"><div id="goal-fill" class="goal-fill"></div></div>
           <div class="goal-row">
@@ -103,6 +104,10 @@
         </div>
         <ul id="today-list" class="today-list"></ul>
         <p id="today-empty" class="results-empty">ยังไม่มีมื้อที่บันทึกวันนี้</p>
+        <div class="notify-row" id="notify-row" hidden>
+          <span class="notify-hint">เตือนบันทึกมื้อเย็นทุกวัน</span>
+          <button type="button" id="notify-btn" class="btn-small">เปิดแจ้งเตือน</button>
+        </div>
       </div>
     </section>
 
