@@ -29,7 +29,7 @@ Snap a photo of your food, let an AI vision model estimate the calories, and tra
 | 3 ✅ | Backend proxy: n8n workflow holds the API key (never ship keys in frontend code) |
 | 4 ✅ | Database: persist each meal to Supabase (foods, calories, timestamp) |
 | 5 ✅ | Daily dashboard: today's total, meal list, delete/edit entries |
-| 6 | History & trends: calendar view, weekly charts, daily goal setting |
+| 6 ✅ | History & trends: last-7-days chart, daily history list, daily goal setting |
 | 7 | Polish: offline queue for photos, loading states, error handling, image compression |
 | 8 | Ship: final testing on iPhone/Android, app icon polish, share with friends |
 

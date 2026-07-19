@@ -66,14 +66,38 @@
       <h2 class="section-title">วันนี้กินไปแล้ว</h2>
       <div class="results-card today-card">
         <p class="today-total"><span id="today-total">0</span> kcal</p>
+        <div class="goal-block">
+          <div class="goal-bar" role="presentation"><div id="goal-fill" class="goal-fill"></div></div>
+          <div class="goal-row">
+            <span id="goal-status" class="goal-status"></span>
+            <button type="button" id="goal-edit-btn" class="btn-small">แก้เป้า</button>
+          </div>
+          <div id="goal-edit" class="meal-edit" hidden>
+            <input type="number" id="goal-input" class="meal-edit-input" min="1" inputmode="numeric">
+            <button type="button" id="goal-save-btn" class="btn-small">บันทึก</button>
+            <button type="button" id="goal-cancel-btn" class="btn-small">ยกเลิก</button>
+          </div>
+        </div>
         <ul id="today-list" class="today-list"></ul>
         <p id="today-empty" class="results-empty">ยังไม่มีมื้อที่บันทึกวันนี้</p>
+      </div>
+    </section>
+
+    <section class="week-section" id="week-section">
+      <h2 class="section-title">7 วันที่ผ่านมา</h2>
+      <div class="results-card week-card">
+        <div class="week-chart">
+          <div id="chart-plot" class="chart-plot"></div>
+          <div id="chart-days" class="chart-days"></div>
+        </div>
+        <p id="chart-readout" class="chart-readout">แตะที่แท่งเพื่อดูยอดแต่ละวัน</p>
+        <ul id="history-list" class="history-list"></ul>
       </div>
     </section>
   </main>
 
   <footer class="app-footer">
-    <p>Week 5 · daily dashboard</p>
+    <p>Week 6 · history &amp; weekly chart</p>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>

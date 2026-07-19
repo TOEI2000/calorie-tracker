@@ -1,4 +1,4 @@
-// CalTrack — week 5: daily dashboard (meal names, macro details, edit/delete).
+// CalTrack — week 6: history, weekly chart, daily calorie goal.
 
 const WEBHOOK_URL = "https://srv1699496.hstgr.cloud/webhook/calorie-upload";
 
@@ -51,6 +51,15 @@ const dismissBtn = document.getElementById("dismiss-btn");
 const todayTotalEl = document.getElementById("today-total");
 const todayListEl = document.getElementById("today-list");
 const todayEmptyEl = document.getElementById("today-empty");
+const goalFillEl = document.getElementById("goal-fill");
+const goalStatusEl = document.getElementById("goal-status");
+const goalEditBtn = document.getElementById("goal-edit-btn");
+const goalEditEl = document.getElementById("goal-edit");
+const goalInputEl = document.getElementById("goal-input");
+const chartPlotEl = document.getElementById("chart-plot");
+const chartDaysEl = document.getElementById("chart-days");
+const chartReadoutEl = document.getElementById("chart-readout");
+const historyListEl = document.getElementById("history-list");
 
 let lastAnalysis = null;
 
@@ -130,7 +139,7 @@ saveBtn.addEventListener("click", async () => {
   saveActions.hidden = true;
   resultsEl.replaceChildren(el("p", "results-status", "บันทึกแล้ว ✓"));
   lastAnalysis = null;
-  loadTodayMeals();
+  loadDashboard();
 });
 
 dismissBtn.addEventListener("click", resetToStart);
@@ -151,28 +160,176 @@ function resetToStart() {
 
 // --- Today's meals ---
 
-async function loadTodayMeals() {
-  const midnight = new Date();
-  midnight.setHours(0, 0, 0, 0);
+// --- Daily goal (stored per device) ---
+
+const GOAL_KEY = "caltrack_daily_goal";
+const GOAL_DEFAULT = 2000;
+
+function getGoal() {
+  const stored = Number.parseInt(localStorage.getItem(GOAL_KEY), 10);
+  return Number.isNaN(stored) || stored < 1 ? GOAL_DEFAULT : stored;
+}
+
+goalEditBtn.addEventListener("click", () => {
+  goalInputEl.value = getGoal();
+  goalEditEl.hidden = false;
+  goalEditBtn.hidden = true;
+  goalInputEl.focus();
+});
+
+document.getElementById("goal-cancel-btn").addEventListener("click", () => {
+  goalEditEl.hidden = true;
+  goalEditBtn.hidden = false;
+});
+
+document.getElementById("goal-save-btn").addEventListener("click", () => {
+  const value = Number.parseInt(goalInputEl.value, 10);
+  if (Number.isNaN(value) || value < 1) {
+    window.alert("ใส่ตัวเลขเป้าหมายให้ถูกต้อง");
+    return;
+  }
+  localStorage.setItem(GOAL_KEY, String(value));
+  goalEditEl.hidden = true;
+  goalEditBtn.hidden = false;
+  loadDashboard();
+});
+
+function renderGoal(todayTotal) {
+  const goal = getGoal();
+  const pct = Math.min((todayTotal / goal) * 100, 100);
+  goalFillEl.style.width = `${pct}%`;
+  goalFillEl.classList.toggle("goal-fill-over", todayTotal > goal);
+
+  const goalText = goal.toLocaleString("th-TH");
+  if (todayTotal > goal) {
+    goalStatusEl.textContent = `เกินเป้า ${(todayTotal - goal).toLocaleString("th-TH")} kcal (เป้า ${goalText})`;
+  } else {
+    goalStatusEl.textContent = `เหลืออีก ${(goal - todayTotal).toLocaleString("th-TH")} kcal จากเป้า ${goalText}`;
+  }
+}
+
+// --- Dashboard (today + last 7 days) ---
+
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+const dayKey = (date) => startOfDay(date).getTime();
+
+async function loadDashboard() {
+  const todayStart = startOfDay(new Date());
+  const rangeStart = new Date(todayStart);
+  rangeStart.setDate(rangeStart.getDate() - 6);
 
   const { data, error } = await db
     .from("meals")
     .select("id, eaten_at, items, total_calories, note")
-    .gte("eaten_at", midnight.toISOString())
+    .gte("eaten_at", rangeStart.toISOString())
     .order("eaten_at", { ascending: false });
 
   if (error) {
     todayEmptyEl.hidden = false;
-    todayEmptyEl.textContent = `โหลดรายการวันนี้ไม่สำเร็จ — ${error.message}`;
+    todayEmptyEl.textContent = `โหลดรายการไม่สำเร็จ — ${error.message}`;
     return;
   }
 
-  const total = data.reduce((sum, meal) => sum + (meal.total_calories ?? 0), 0);
-  todayTotalEl.textContent = total.toLocaleString("th-TH");
-
-  todayListEl.replaceChildren(...data.map(renderMealItem));
-  todayEmptyEl.hidden = data.length > 0;
+  // Today's detail list
+  const todayMeals = data.filter((m) => new Date(m.eaten_at) >= todayStart);
+  const todayTotal = todayMeals.reduce((sum, m) => sum + (m.total_calories ?? 0), 0);
+  todayTotalEl.textContent = todayTotal.toLocaleString("th-TH");
+  todayListEl.replaceChildren(...todayMeals.map(renderMealItem));
+  todayEmptyEl.hidden = todayMeals.length > 0;
   todayEmptyEl.textContent = "ยังไม่มีมื้อที่บันทึกวันนี้";
+
+  renderGoal(todayTotal);
+
+  // Bucket all 7 days (oldest -> newest)
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(todayStart);
+    date.setDate(date.getDate() - i);
+    days.push({ date, total: 0, mealCount: 0 });
+  }
+  const byKey = new Map(days.map((d) => [dayKey(d.date), d]));
+  for (const meal of data) {
+    const bucket = byKey.get(dayKey(new Date(meal.eaten_at)));
+    if (!bucket) continue;
+    bucket.total += meal.total_calories ?? 0;
+    bucket.mealCount += 1;
+  }
+
+  renderWeekChart(days);
+  renderHistoryList(days);
+}
+
+function dayLabel(date) {
+  return date.toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short" });
+}
+
+function renderWeekChart(days) {
+  const goal = getGoal();
+  const scaleMax = Math.max(goal, ...days.map((d) => d.total)) * 1.08;
+
+  chartPlotEl.replaceChildren(
+    ...days.map((day, i) => {
+      const col = document.createElement("div");
+      col.className = "chart-col";
+
+      const isToday = i === days.length - 1;
+      const value = el("span", "chart-value", day.total.toLocaleString("th-TH"));
+      value.hidden = !isToday; // selective label: only today by default
+
+      const bar = document.createElement("button");
+      bar.type = "button";
+      bar.className = "chart-bar";
+      bar.style.height = `${Math.max((day.total / scaleMax) * 100, day.total > 0 ? 2 : 0.5)}%`;
+      bar.setAttribute("aria-label", `${dayLabel(day.date)} ${day.total.toLocaleString("th-TH")} kcal`);
+      bar.addEventListener("click", () => {
+        chartReadoutEl.textContent = `${dayLabel(day.date)} — ${day.total.toLocaleString("th-TH")} kcal (${day.mealCount} มื้อ)`;
+        chartPlotEl.querySelectorAll(".chart-value").forEach((v, j) => (v.hidden = j !== i));
+      });
+
+      col.append(value, bar);
+      return col;
+    })
+  );
+
+  // Dashed goal line, positioned as a fraction of the plot height
+  const goalLine = document.createElement("div");
+  goalLine.className = "goal-line";
+  goalLine.style.bottom = `${(goal / scaleMax) * 100}%`;
+  const goalTag = el("span", "goal-line-tag", `เป้า ${goal.toLocaleString("th-TH")}`);
+  goalLine.append(goalTag);
+  chartPlotEl.append(goalLine);
+
+  chartDaysEl.replaceChildren(
+    ...days.map((day, i) => {
+      const label = day.date.toLocaleDateString("th-TH", { weekday: "narrow" });
+      const num = day.date.getDate();
+      return el("span", "chart-day", i === days.length - 1 ? "วันนี้" : `${label} ${num}`);
+    })
+  );
+}
+
+function renderHistoryList(days) {
+  const goal = getGoal();
+  historyListEl.replaceChildren(
+    ...[...days].reverse().map((day, i) => {
+      const li = document.createElement("li");
+      const name = i === 0 ? "วันนี้" : i === 1 ? "เมื่อวาน" : dayLabel(day.date);
+      const detail =
+        day.mealCount > 0
+          ? `${day.mealCount} มื้อ · ${day.total.toLocaleString("th-TH")} kcal${day.total > goal ? " · เกินเป้า" : ""}`
+          : "ไม่มีบันทึก";
+      li.append(
+        el("span", "history-day", name),
+        el("span", day.total > goal ? "history-kcal history-over" : "history-kcal", detail)
+      );
+      return li;
+    })
+  );
 }
 
 function renderMealItem(meal) {
@@ -233,7 +390,7 @@ function renderMealItem(meal) {
       window.alert(`ลบไม่สำเร็จ — ${error.message}`);
       return;
     }
-    loadTodayMeals();
+    loadDashboard();
   });
 
   actions.append(editBtn, deleteBtn);
@@ -277,7 +434,7 @@ function startEditCalories(meal, details, actions) {
       window.alert(`แก้ไขไม่สำเร็จ — ${error.message}`);
       return;
     }
-    loadTodayMeals();
+    loadDashboard();
   });
 
   const cancelBtn = document.createElement("button");
@@ -291,7 +448,7 @@ function startEditCalories(meal, details, actions) {
   input.focus();
 }
 
-loadTodayMeals();
+loadDashboard();
 
 // textContent (not innerHTML) so server responses can't inject markup
 function el(tag, className, text) {
