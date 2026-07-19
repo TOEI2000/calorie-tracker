@@ -1,4 +1,4 @@
-// CalTrack — week 6: history, weekly chart, daily calorie goal.
+// CalTrack — week 7: polish (image compression, loading states, retry, offline queue).
 
 const WEBHOOK_URL = "https://srv1699496.hstgr.cloud/webhook/calorie-upload";
 
@@ -45,6 +45,9 @@ function handlePhotoSelected(event) {
 }
 
 const resultsEl = document.getElementById("results");
+const queueBanner = document.getElementById("queue-banner");
+const queueTextEl = document.getElementById("queue-text");
+const queueAnalyzeBtn = document.getElementById("queue-analyze-btn");
 const saveActions = document.getElementById("save-actions");
 const saveBtn = document.getElementById("save-btn");
 const dismissBtn = document.getElementById("dismiss-btn");
@@ -63,40 +66,203 @@ const historyListEl = document.getElementById("history-list");
 
 let lastAnalysis = null;
 
-analyzeBtn.addEventListener("click", async () => {
-  if (!currentFile) {
-    showError("No photo selected yet — take a photo first.");
-    return;
+// --- Image compression (multi-MB camera photos -> a few hundred KB) ---
+
+const MAX_DIMENSION = 1280;
+const JPEG_QUALITY = 0.85;
+
+async function compressImage(file) {
+  try {
+    // "from-image" applies the EXIF rotation so the photo arrives upright
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY));
+    if (!blob || blob.size >= file.size) return file;
+    console.log(`Compressed photo: ${Math.round(file.size / 1024)} KB -> ${Math.round(blob.size / 1024)} KB`);
+    return new File([blob], "photo.jpg", { type: "image/jpeg" });
+  } catch {
+    return file; // compression is best-effort; the original still works
+  }
+}
+
+// --- Analyze (with timeout, retry, and offline queueing) ---
+
+const ANALYZE_TIMEOUT_MS = 60000;
+
+analyzeBtn.addEventListener("click", () => analyzePhoto(currentFile));
+
+async function analyzePhoto(file, { skipCompress = false, queueOnFailure = true } = {}) {
+  if (!file) {
+    showError("ยังไม่ได้เลือกรูป — ถ่ายรูปก่อนนะครับ");
+    return false;
   }
 
-  const formData = new FormData();
-  formData.append("photo", currentFile, currentFile.name || "photo.jpg");
-
   analyzeBtn.disabled = true;
-  showStatus("Analyzing…");
 
   try {
-    const response = await fetch(WEBHOOK_URL, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Server responded with ${response.status} ${response.statusText}`);
+    let photo = file;
+    if (!skipCompress) {
+      showStatus("กำลังเตรียมรูป…", { spinner: true });
+      photo = await compressImage(file);
     }
 
-    const data = await response.json();
-    showResult(data);
-  } catch (err) {
-    showError(err.message || String(err));
+    if (!navigator.onLine) {
+      if (queueOnFailure) {
+        await queueAdd(photo);
+        await updateQueueBanner();
+        showStatus("ออฟไลน์อยู่ — เก็บรูปไว้ในคิวแล้ว จะวิเคราะห์ได้เมื่อกลับมาออนไลน์");
+      } else {
+        showError("ยังออฟไลน์อยู่ — ลองใหม่เมื่อมีเน็ตครับ");
+      }
+      return false;
+    }
+
+    showStatus("กำลังวิเคราะห์…", { spinner: true });
+
+    const formData = new FormData();
+    formData.append("photo", photo, photo.name || "photo.jpg");
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+    try {
+      const response = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`เซิร์ฟเวอร์ตอบ ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json();
+      showResult(data);
+      return true;
+    } catch (err) {
+      if (err.name === "AbortError") {
+        showAnalyzeError("หมดเวลารอ (60 วินาที)", photo);
+      } else if (err instanceof TypeError) {
+        // fetch network failure (connection dropped mid-flight)
+        if (queueOnFailure) {
+          await queueAdd(photo);
+          await updateQueueBanner();
+          showStatus("ส่งไม่สำเร็จ (เน็ตมีปัญหา) — เก็บรูปไว้ในคิวแล้ว");
+        } else {
+          showAnalyzeError("ส่งไม่สำเร็จ (เน็ตมีปัญหา)", photo);
+        }
+      } else {
+        showAnalyzeError(err.message || String(err), photo);
+      }
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
   } finally {
     analyzeBtn.disabled = false;
   }
+}
+
+function showAnalyzeError(message, photo) {
+  saveActions.hidden = true;
+  const wrap = el("div", "results-error-wrap", "");
+  wrap.append(el("p", "results-error", `ผิดพลาด: ${message}`));
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.className = "btn-small";
+  retry.textContent = "ลองใหม่";
+  retry.addEventListener("click", () => analyzePhoto(photo, { skipCompress: true }));
+  wrap.append(retry);
+  resultsEl.replaceChildren(wrap);
+}
+
+// --- Offline queue (IndexedDB) ---
+
+function openQueueDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("caltrack-queue", 1);
+    req.onupgradeneeded = () =>
+      req.result.createObjectStore("photos", { keyPath: "id", autoIncrement: true });
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function queueAdd(blob) {
+  const qdb = await openQueueDb();
+  await new Promise((resolve, reject) => {
+    const tx = qdb.transaction("photos", "readwrite");
+    tx.objectStore("photos").add({ blob, queuedAt: Date.now() });
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+  qdb.close();
+}
+
+async function queueGetAll() {
+  const qdb = await openQueueDb();
+  const entries = await new Promise((resolve, reject) => {
+    const req = qdb.transaction("photos", "readonly").objectStore("photos").getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  qdb.close();
+  return entries;
+}
+
+async function queueRemove(id) {
+  const qdb = await openQueueDb();
+  await new Promise((resolve, reject) => {
+    const tx = qdb.transaction("photos", "readwrite");
+    tx.objectStore("photos").delete(id);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+  qdb.close();
+}
+
+async function updateQueueBanner() {
+  const entries = await queueGetAll().catch(() => []);
+  queueBanner.hidden = entries.length === 0;
+  if (entries.length > 0) {
+    queueTextEl.textContent = `📥 มีรูปรอวิเคราะห์ ${entries.length} รูป`;
+  }
+}
+
+queueAnalyzeBtn.addEventListener("click", async () => {
+  const entries = await queueGetAll().catch(() => []);
+  if (entries.length === 0) {
+    updateQueueBanner();
+    return;
+  }
+  const oldest = entries[0];
+  const file = new File([oldest.blob], "queued-photo.jpg", {
+    type: oldest.blob.type || "image/jpeg",
+  });
+
+  if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+  currentFile = file;
+  currentObjectUrl = URL.createObjectURL(file);
+  previewImage.src = currentObjectUrl;
+  previewSection.hidden = false;
+
+  const ok = await analyzePhoto(file, { skipCompress: true, queueOnFailure: false });
+  if (ok) {
+    await queueRemove(oldest.id);
+  }
+  updateQueueBanner();
 });
 
-function showStatus(message) {
+window.addEventListener("online", updateQueueBanner);
+updateQueueBanner();
+
+function showStatus(message, { spinner = false } = {}) {
   saveActions.hidden = true;
-  resultsEl.replaceChildren(el("p", "results-status", message));
+  const status = el("p", "results-status", message);
+  if (spinner) status.prepend(el("span", "spinner", ""));
+  resultsEl.replaceChildren(status);
 }
 
 function showError(message) {
