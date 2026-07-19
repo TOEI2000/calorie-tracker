@@ -1,5 +1,7 @@
 # CalTrack — Daily Calorie Tracker PWA
 
+**Live app: https://toei2000.github.io/calorie-tracker/**
+
 Snap a photo of your food, let an AI vision model estimate the calories, and track your daily intake — all from a lightweight Progressive Web App you can add to your phone's home screen.
 
 **Stack:** plain HTML/CSS/JS, no framework, no build step. Hosted free on GitHub Pages.
@@ -11,7 +13,7 @@ Snap a photo of your food, let an AI vision model estimate the calories, and tra
 3. Tap **Analyze** — an AI vision model identifies the food and estimates calories
 4. The result is saved to a database so you can see daily totals and history
 
-## Current status: Week 5 ✅
+## Current status: complete (8/8 weeks) 🎉
 
 - 📷 Camera capture + gallery picker, photo preview
 - ✨ **Analyze** sends the photo to an n8n webhook; a vision model returns items with Thai names, per-item macros, and total calories
@@ -31,7 +33,7 @@ Snap a photo of your food, let an AI vision model estimate the calories, and tra
 | 5 ✅ | Daily dashboard: today's total, meal list, delete/edit entries |
 | 6 ✅ | History & trends: last-7-days chart, daily history list, daily goal setting |
 | 7 ✅ | Polish: offline queue for photos, loading states, error handling, image compression |
-| 8 | Ship: final testing on iPhone/Android, app icon polish, share with friends |
+| 8 ✅ | Ship: final testing on iPhone/Android, app icon polish, share with friends |
 
 ## Project structure
 

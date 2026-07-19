@@ -6,7 +6,8 @@
   <title>CalTrack — Daily Calorie Tracker</title>
   <meta name="description" content="Snap a photo of your food and track your daily calories.">
 
-  <meta name="theme-color" content="#16a34a">
+  <meta name="theme-color" content="#16a34a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111813" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="manifest.json">
 
   <!-- iOS Add to Home Screen -->
@@ -74,7 +75,10 @@
           <div class="goal-bar" role="presentation"><div id="goal-fill" class="goal-fill"></div></div>
           <div class="goal-row">
             <span id="goal-status" class="goal-status"></span>
-            <button type="button" id="goal-edit-btn" class="btn-small">แก้เป้า</button>
+            <span class="goal-actions">
+              <button type="button" id="share-btn" class="btn-small">แชร์</button>
+              <button type="button" id="goal-edit-btn" class="btn-small">แก้เป้า</button>
+            </span>
           </div>
           <div id="goal-edit" class="meal-edit" hidden>
             <input type="number" id="goal-input" class="meal-edit-input" min="1" inputmode="numeric">
@@ -101,7 +105,7 @@
   </main>
 
   <footer class="app-footer">
-    <p>Week 7 · polish: compression, retry, offline queue</p>
+    <p>CalTrack · ถ่ายรูป รู้แคลอรี่ 🥗</p>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>

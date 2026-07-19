@@ -1,6 +1,6 @@
 // CalTrack service worker — minimal app-shell cache for offline / Add to Home Screen.
 // Bump CACHE_NAME whenever any cached file changes so clients pick up the update.
-const CACHE_NAME = "caltrack-v7";
+const CACHE_NAME = "caltrack-v8";
 
 const APP_SHELL = [
   "./",
@@ -10,6 +10,8 @@ const APP_SHELL = [
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
+  "./icons/icon-192-maskable.png",
+  "./icons/icon-512-maskable.png",
   "./icons/apple-touch-icon.png",
 ];
 

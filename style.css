@@ -410,6 +410,12 @@ body {
   gap: 8px;
 }
 
+.goal-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .goal-status {
   font-size: 0.88rem;
   color: var(--text-muted);

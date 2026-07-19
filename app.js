@@ -1,4 +1,4 @@
-// CalTrack — week 7: polish (image compression, loading states, retry, offline queue).
+// CalTrack — week 8: ship (share button, icon polish, final QA).
 
 const WEBHOOK_URL = "https://srv1699496.hstgr.cloud/webhook/calorie-upload";
 
@@ -257,6 +257,29 @@ queueAnalyzeBtn.addEventListener("click", async () => {
 
 window.addEventListener("online", updateQueueBanner);
 updateQueueBanner();
+
+// --- Share today's summary (Web Share API, clipboard fallback) ---
+
+document.getElementById("share-btn").addEventListener("click", async () => {
+  const total = todayTotalEl.textContent;
+  const goal = getGoal().toLocaleString("th-TH");
+  const url = "https://toei2000.github.io/calorie-tracker/";
+  const text = `วันนี้ฉันกินไป ${total} kcal (เป้า ${goal} kcal) 🥗 บันทึกแคลอรี่ง่ายๆ แค่ถ่ายรูปอาหารกับ CalTrack`;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: "CalTrack", text, url });
+    } catch {
+      // user closed the share sheet — nothing to do
+    }
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    window.alert("คัดลอกข้อความแล้ว — วางแชร์ได้เลย");
+  } catch {
+    window.prompt("คัดลอกข้อความนี้ไปแชร์ได้เลย", `${text}\n${url}`);
+  }
+});
 
 function showStatus(message, { spinner = false } = {}) {
   saveActions.hidden = true;
