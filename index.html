@@ -23,9 +23,24 @@
   <header class="app-header">
     <h1>CalTrack</h1>
     <p class="tagline">Snap your food. Know your calories.</p>
+    <p id="user-bar" class="user-bar" hidden>
+      <span id="user-email"></span>
+      <button type="button" id="logout-btn" class="link-btn">ออกจากระบบ</button>
+    </p>
   </header>
 
   <main class="app-main">
+    <section id="auth-section" class="auth-section" hidden>
+      <div class="results-card auth-card">
+        <h2 class="section-title">เข้าสู่ระบบ</h2>
+        <p class="auth-hint">กรอกอีเมลแล้วกดลิงก์ที่เราส่งไปให้ — ข้อมูลมื้ออาหารจะถูกเก็บแยกเป็นของคุณคนเดียว</p>
+        <input type="email" id="auth-email" class="auth-input" placeholder="your@email.com" autocomplete="email" inputmode="email">
+        <button type="button" id="auth-send-btn" class="btn btn-primary">ส่งลิงก์เข้าสู่ระบบ</button>
+        <p id="auth-message" class="auth-message" hidden></p>
+      </div>
+    </section>
+
+    <div id="app-content" hidden>
     <section class="capture-section">
       <!-- Opens the rear camera directly on phones -->
       <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
@@ -102,6 +117,7 @@
         <ul id="history-list" class="history-list"></ul>
       </div>
     </section>
+    </div><!-- /app-content -->
   </main>
 
   <footer class="app-footer">

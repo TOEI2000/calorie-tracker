@@ -1,4 +1,4 @@
-// CalTrack — week 8: ship (share button, icon polish, final QA).
+// CalTrack — bonus week: per-user accounts (email magic link + RLS).
 
 const WEBHOOK_URL = "https://srv1699496.hstgr.cloud/webhook/calorie-upload";
 
@@ -18,6 +18,62 @@ const analyzeBtn = document.getElementById("analyze-btn");
 
 let currentObjectUrl = null;
 let currentFile = null;
+let currentUser = null;
+
+// --- Auth (email magic link) ---
+
+const authSection = document.getElementById("auth-section");
+const appContent = document.getElementById("app-content");
+const authEmailEl = document.getElementById("auth-email");
+const authSendBtn = document.getElementById("auth-send-btn");
+const authMessageEl = document.getElementById("auth-message");
+const userBar = document.getElementById("user-bar");
+const userEmailEl = document.getElementById("user-email");
+
+function setAuthState(session) {
+  currentUser = session?.user ?? null;
+  const loggedIn = currentUser !== null;
+  authSection.hidden = loggedIn;
+  appContent.hidden = !loggedIn;
+  userBar.hidden = !loggedIn;
+  if (loggedIn) {
+    userEmailEl.textContent = currentUser.email ?? "";
+    loadDashboard();
+  }
+}
+
+db.auth.getSession().then(({ data }) => setAuthState(data.session));
+db.auth.onAuthStateChange((_event, session) => setAuthState(session));
+
+authSendBtn.addEventListener("click", async () => {
+  const email = authEmailEl.value.trim();
+  if (!email || !email.includes("@")) {
+    showAuthMessage("กรอกอีเมลให้ถูกต้องก่อนนะครับ", true);
+    return;
+  }
+  authSendBtn.disabled = true;
+  const { error } = await db.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin + window.location.pathname },
+  });
+  authSendBtn.disabled = false;
+  if (error) {
+    showAuthMessage(`ส่งลิงก์ไม่สำเร็จ — ${error.message}`, true);
+  } else {
+    showAuthMessage(`ส่งลิงก์ไปที่ ${email} แล้ว 📧 เปิดอีเมลแล้วกดลิงก์เพื่อเข้าสู่ระบบ (เช็คใน Junk ด้วยถ้าไม่เจอ)`, false);
+  }
+});
+
+function showAuthMessage(message, isError) {
+  authMessageEl.hidden = false;
+  authMessageEl.textContent = message;
+  authMessageEl.classList.toggle("auth-message-error", isError);
+}
+
+document.getElementById("logout-btn").addEventListener("click", async () => {
+  await db.auth.signOut();
+  resetToStart();
+});
 
 takePhotoBtn.addEventListener("click", () => cameraInput.click());
 galleryBtn.addEventListener("click", () => galleryInput.click());
@@ -257,6 +313,7 @@ queueAnalyzeBtn.addEventListener("click", async () => {
 
 window.addEventListener("online", updateQueueBanner);
 updateQueueBanner();
+// Note: loadDashboard() runs from setAuthState() once a session is confirmed.
 
 // --- Share today's summary (Web Share API, clipboard fallback) ---
 
@@ -311,6 +368,7 @@ saveBtn.addEventListener("click", async () => {
   saveBtn.textContent = "กำลังบันทึก…";
 
   const { error } = await db.from("meals").insert({
+    user_id: currentUser?.id ?? null,
     eaten_at: new Date().toISOString(),
     items: lastAnalysis.items ?? [],
     total_calories: lastAnalysis.total_calories ?? null,
@@ -408,6 +466,7 @@ function startOfDay(date) {
 const dayKey = (date) => startOfDay(date).getTime();
 
 async function loadDashboard() {
+  if (!currentUser) return;
   const todayStart = startOfDay(new Date());
   const rangeStart = new Date(todayStart);
   rangeStart.setDate(rangeStart.getDate() - 6);
@@ -636,8 +695,6 @@ function startEditCalories(meal, details, actions) {
   details.insertBefore(wrap, actions);
   input.focus();
 }
-
-loadDashboard();
 
 // textContent (not innerHTML) so server responses can't inject markup
 function el(tag, className, text) {
