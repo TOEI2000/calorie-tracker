@@ -28,6 +28,11 @@
   box-sizing: border-box;
 }
 
+/* Author display rules (e.g. flex) must not override the hidden attribute */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -198,6 +203,65 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
   text-align: left;
+}
+
+.save-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* Today's meals */
+
+.today-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.today-total {
+  margin: 0;
+  text-align: center;
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--green-600);
+}
+
+.today-total span {
+  font-variant-numeric: tabular-nums;
+}
+
+.today-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.today-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+}
+
+.today-list li:last-child {
+  border-bottom: none;
+}
+
+.today-time {
+  color: var(--text-muted);
+}
+
+.today-kcal {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .app-footer {

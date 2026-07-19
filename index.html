@@ -56,13 +56,27 @@
       <div id="results" class="results-card">
         <p class="results-empty">No results yet — take a photo of your food to get started.</p>
       </div>
+      <div id="save-actions" class="save-actions" hidden>
+        <button type="button" id="save-btn" class="btn btn-primary">บันทึกมื้อนี้</button>
+        <button type="button" id="dismiss-btn" class="btn btn-secondary">แค่เช็คเฉยๆ ไม่บันทึก</button>
+      </div>
+    </section>
+
+    <section class="today-section" id="today-section">
+      <h2 class="section-title">วันนี้กินไปแล้ว</h2>
+      <div class="results-card today-card">
+        <p class="today-total"><span id="today-total">0</span> kcal</p>
+        <ul id="today-list" class="today-list"></ul>
+        <p id="today-empty" class="results-empty">ยังไม่มีมื้อที่บันทึกวันนี้</p>
+      </div>
     </section>
   </main>
 
   <footer class="app-footer">
-    <p>Week 2 · AI calorie analysis</p>
+    <p>Week 4 · saving meals to Supabase</p>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
