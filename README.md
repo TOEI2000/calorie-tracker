@@ -11,25 +11,24 @@ Snap a photo of your food, let an AI vision model estimate the calories, and tra
 3. Tap **Analyze** — an AI vision model identifies the food and estimates calories
 4. The result is saved to a database so you can see daily totals and history
 
-## Current status: Week 1 ✅
+## Current status: Week 5 ✅
 
-Frontend skeleton only:
-
-- 📷 Camera capture via `<input type="file" accept="image/*" capture="environment">`, plus a gallery picker
-- 🖼️ Photo preview after capture
-- ✨ Placeholder **Analyze** button (logs to console — no AI yet)
+- 📷 Camera capture + gallery picker, photo preview
+- ✨ **Analyze** sends the photo to an n8n webhook; a vision model returns items with Thai names, per-item macros, and total calories
+- 💾 Save meals to Supabase (`meals` table, RLS enabled), or dismiss without saving
+- 📊 "วันนี้กินไปแล้ว" dashboard: today's running total, expandable meal list with macros, edit calories, delete meals
 - 📱 Mobile-first UI, system fonts, light/dark mode
-- 🏠 Installable PWA: `manifest.json` + minimal service worker
+- 🏠 Installable PWA: `manifest.json` + service worker
 
 ## 8-week roadmap
 
 | Week | Goal |
 |------|------|
 | 1 ✅ | Frontend skeleton: camera capture, preview, PWA shell, GitHub Pages deploy |
-| 2 | AI vision integration: send photo to a vision model (e.g. Claude API) and get a calorie estimate |
-| 3 | Backend proxy: small serverless function to hold the API key (never ship keys in frontend code) |
-| 4 | Database: persist each meal (photo, foods, calories, timestamp) |
-| 5 | Daily dashboard: today's total, meal list, delete/edit entries |
+| 2 ✅ | AI vision integration: send photo to a vision model and get a calorie estimate |
+| 3 ✅ | Backend proxy: n8n workflow holds the API key (never ship keys in frontend code) |
+| 4 ✅ | Database: persist each meal to Supabase (foods, calories, timestamp) |
+| 5 ✅ | Daily dashboard: today's total, meal list, delete/edit entries |
 | 6 | History & trends: calendar view, weekly charts, daily goal setting |
 | 7 | Polish: offline queue for photos, loading states, error handling, image compression |
 | 8 | Ship: final testing on iPhone/Android, app icon polish, share with friends |
